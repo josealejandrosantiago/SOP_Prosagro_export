@@ -173,10 +173,21 @@ def parsear(ruta: str | Path) -> InformeMaquila:
     ruta = Path(ruta)
     wb = openpyxl.load_workbook(ruta, data_only=True)
 
-    nombre_export = "export" if "export" in wb.sheetnames else "Export"
-    ing_rows = _leer_hoja(wb["Informe de Ingreso"])
-    exp_rows = _leer_hoja(wb[nombre_export])
-    nal_rows = _leer_hoja(wb["Nal"])
+    # Las hojas vienen con casing inconsistente entre archivos (`Nal` vs `nal`,
+    # `Export` vs `export`). Resuelvo case-insensitive antes de leer.
+    def _hoja(*candidatos: str):
+        lower = {s.lower(): s for s in wb.sheetnames}
+        for c in candidatos:
+            if c.lower() in lower:
+                return wb[lower[c.lower()]]
+        raise KeyError(
+            f"No encontré ninguna hoja con nombre {candidatos} en {ruta.name}. "
+            f"Hojas presentes: {wb.sheetnames}"
+        )
+
+    ing_rows = _leer_hoja(_hoja("Informe de Ingreso"))
+    exp_rows = _leer_hoja(_hoja("Export", "export"))
+    nal_rows = _leer_hoja(_hoja("Nal", "nal", "Nacional"))
 
     anio = _get_anio(ing_rows or exp_rows)
     semana_val = next(
@@ -231,10 +242,14 @@ def parsear(ruta: str | Path) -> InformeMaquila:
         traza = _trazabilidad(anio, fecha, no_cargue, consec_norm)
         cant_cajas = float(r.get("cant_cajas") or 0)
         total_kg = float(r.get("total_kilos_netos") or 0)
-        calibre_num = None
+        # Extraer calibre_num del id_calibre. Soporta formato 'EUR30' (numérico,
+        # se queda con '30') y formato 'CalM' / 'EURM' (mix, se queda con 'M').
+        # El packing list de la maquila usa esos códigos para los pallets.
         idcal = str(r.get("id_calibre") or "")
-        if len(idcal) >= 5:
-            calibre_num = idcal[3:5]
+        calibre_num: str | None = None
+        m_cal = re.search(r"(\d{2,}|[A-Za-z])$", idcal)
+        if m_cal:
+            calibre_num = m_cal.group(1).upper() if m_cal.group(1).isalpha() else m_cal.group(1)
 
         if _es_calibre_26(r):
             sim_kg_por_traza[traza] = sim_kg_por_traza.get(traza, 0.0) + total_kg
