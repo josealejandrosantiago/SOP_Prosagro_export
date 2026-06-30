@@ -7,12 +7,16 @@ SET search_path TO prosagro, public;
 
 -- Zonas — mapeo de codigo_interno (lo que viene en la trazabilidad) a
 -- codigo_externo (lo que entrega la maquila). Tomado del módulo Predio.
+-- Zona '05'/126 detectada en `Base de datos productores` (1 productor en
+-- Marinilla) sin mapeo en VBA — la dejamos como gulupa hasta que el usuario
+-- confirme.
 INSERT INTO zonas (codigo_interno, codigo_externo, nombre, fruta_dominante) VALUES
-    ('01', 123, 'Gulupa San José',  'gulupa'),
-    ('02', 122, 'Gulupa Urrao',     'gulupa'),
-    ('03', 124, 'Gulupa Oriente',   'gulupa'),
-    ('04', 125, 'Uchuva',           'uchuva'),
-    ('06', 127, 'Sweet Mango',      'mango')
+    ('01', 123, 'Gulupa San José',     'gulupa'),
+    ('02', 122, 'Gulupa Urrao',        'gulupa'),
+    ('03', 124, 'Gulupa Oriente',      'gulupa'),
+    ('04', 125, 'Uchuva',              'uchuva'),
+    ('05', 126, 'Zona 126 (revisar)',  'gulupa'),
+    ('06', 127, 'Sweet Mango',         'mango')
 ON CONFLICT (codigo_interno) DO UPDATE
     SET codigo_externo  = EXCLUDED.codigo_externo,
         nombre          = EXCLUDED.nombre,

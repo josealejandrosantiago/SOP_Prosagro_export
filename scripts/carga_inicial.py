@@ -26,6 +26,14 @@ from pathlib import Path
 
 import openpyxl
 
+# Forzar UTF-8 en la consola Windows para que prints con acentos / símbolos
+# como '→' o '✓' no truenen con cp1252.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+except AttributeError:  # pragma: no cover
+    pass
+
 # Permitir `python scripts/carga_inicial.py` desde el root
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -33,42 +41,116 @@ sys.path.insert(0, str(ROOT))
 from conexion import get_conn  # noqa: E402
 
 
+def _mapeo_zonas() -> dict[str, str]:
+    """Lee tabla zonas y devuelve {codigo_externo: codigo_interno}.
+
+    Se necesita porque el Excel viene en codigo_externo (122/123/124/125/126/127)
+    pero la tabla productores referencia codigo_interno (01/02/03/04/05/06).
+    """
+    with get_conn() as conn, conn.cursor() as cur:
+        cur.execute("SELECT codigo_externo, codigo_interno FROM prosagro.zonas")
+        return {str(ext): inter for ext, inter in cur.fetchall()}
+
+
+def _norm_txt(v) -> str | None:
+    """None/'' → None; resto → string strippeado."""
+    if v is None or v == "":
+        return None
+    s = str(v).strip()
+    return s or None
+
+
+def _norm_telefono(v) -> str | None:
+    """Excel a veces guarda teléfono como número científico — lo formateamos."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, (int, float)):
+        return f"{int(v):d}"
+    return str(v).strip() or None
+
+
 def cmd_maestros(args: argparse.Namespace) -> None:
-    """Carga productores + precio_fruta + precio_certificacion desde el Excel."""
+    """Carga productores desde el Excel.
+
+    El mapeo de columnas viene del header real de 'Base de datos gulupa.xlsx':
+      col  1 (idx 0) — Fin vigencia
+      col  2 (idx 1) — Inicio vigencia
+      col  3 (idx 2) — Tipo movimiento (no se usa)
+      col  4 (idx 3) — Zona (codigo_externo)
+      col  5 (idx 4) — Lote
+      col  6 (idx 5) — Estado (no se usa, ej. 'Cosechando' / 'Receso')
+      col  9 (idx 8) — Nombre finca
+      col 10 (idx 9) — Teléfono envío reportes producción
+      col 12 (idx 11) — Ubicación_esp
+      col 14 (idx 13) — Número de plantas
+      col 17 (idx 16) — Nombre contacto (= propietario en VBA)
+      col 18 (idx 17) — Identificación contacto (= documento en VBA)
+      col 21 (idx 20) — ICA
+      col 22 (idx 21) — GLOBAL (= GGN)
+      col 27 (idx 26) — Retención
+      col 28 (idx 27) — Facturación electrónica
+    """
     wb = openpyxl.load_workbook(args.gulupa, data_only=True, read_only=True)
 
-    productores = []
-    if "productores" in [s.lower() for s in wb.sheetnames]:
-        nombre_hoja = next(s for s in wb.sheetnames if s.lower() == "productores")
-        ws = wb[nombre_hoja]
-        # Columnas conocidas (mapeo del VBA):
-        # 1 fecha_hasta, 2 fecha_desde, 4 zona, 5 lote, 9 nombre_finca,
-        # 10 telefono, 12 ubicacion, 14 plantas, 17 propietario, 18 doc,
-        # 21 ica, 22 ggn, 27 retencion, 28 fact_electronica
-        for row in ws.iter_rows(min_row=2, values_only=True):
-            if not row or not row[3]:   # sin zona
-                continue
-            productores.append({
-                "zona": str(row[3] or "").strip(),
-                "lote": str(row[4] or "").strip(),
-                "fecha_desde": row[1],
-                "fecha_hasta": row[0],
-                "nombre_finca": row[8],
-                "telefono": row[9],
-                "ubicacion": row[11],
-                "plantas": row[13],
-                "propietario": row[16],
-                "documento": row[17],
-                "ica": row[20],
-                "ggn": row[21],
-                "retencion": row[26],
-                "fact_electronica": row[27],
-            })
+    nombre_hoja = next((s for s in wb.sheetnames if s.lower() == "productores"), None)
+    if not nombre_hoja:
+        print("  ✗ El Excel no tiene hoja 'Productores'")
+        return
+    ws = wb[nombre_hoja]
 
-    print(f"  Productores leídos: {len(productores)}")
+    mapeo = _mapeo_zonas()
+    productores: list[dict] = []
+    skip_zona = 0
+    skip_propietario = 0
+    skip_documento = 0
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or row[3] is None:
+            continue
+        zona_ext = str(row[3]).strip()
+        zona_int = mapeo.get(zona_ext)
+        if zona_int is None:
+            skip_zona += 1
+            continue
+        propietario = _norm_txt(row[16])
+        documento = _norm_txt(row[17])
+        if not propietario:
+            skip_propietario += 1
+            # OJO: aún así lo cargamos con placeholder para no perder el
+            # registro (pueden ser lotes en setup) pero lo marcamos.
+            propietario = "(sin propietario)"
+        if not documento:
+            skip_documento += 1
+            documento = ""
+        productores.append({
+            "zona":             zona_int,
+            "lote":             str(row[4] or "").strip(),
+            "fecha_desde":      row[1],
+            "fecha_hasta":      row[0],
+            "nombre_finca":     _norm_txt(row[8]) or "(sin nombre)",
+            "propietario":      propietario,
+            "documento":        documento,
+            "plantas":          row[13] if isinstance(row[13], (int, float)) else None,
+            "ubicacion":        _norm_txt(row[11]),
+            "telefono":         _norm_telefono(row[9]),
+            "retencion":        _norm_txt(row[26]),
+            "fact_electronica": _norm_txt(row[27]),
+            "ica":              _norm_txt(row[20]),
+            "ggn":              _norm_txt(row[21]),
+        })
+
+    print(f"  Productores leídos:           {len(productores)}")
+    print(f"  Filas saltadas (zona desconocida): {skip_zona}")
+    print(f"  Sin propietario (placeholder):     {skip_propietario}")
+    print(f"  Sin documento (cadena vacía):      {skip_documento}")
 
     if args.dry_run or not productores:
-        print("  (dry-run) — no se escribió a BD.")
+        print("  (dry-run) — no se escribió a BD. Para escribir: --no-dry-run")
+        # Pequeña muestra
+        print("\n  Muestra (3 primeras filas):")
+        for p in productores[:3]:
+            print(f"    zona={p['zona']} lote={p['lote']} | finca={p['nombre_finca']!r}"
+                  f" | propietario={p['propietario']!r} | doc={p['documento']!r}")
         return
 
     sql = """
@@ -77,18 +159,13 @@ def cmd_maestros(args: argparse.Namespace) -> None:
              nombre_finca, propietario, documento, cantidad_plantas, ubicacion,
              telefono, requiere_retencion, facturacion_electronica,
              ica_propio, ggn_propio)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%(zona)s, %(lote)s, %(fecha_desde)s, %(fecha_hasta)s,
+                %(nombre_finca)s, %(propietario)s, %(documento)s, %(plantas)s,
+                %(ubicacion)s, %(telefono)s, %(retencion)s, %(fact_electronica)s,
+                %(ica)s, %(ggn)s)
     """
     with get_conn() as conn, conn.cursor() as cur:
-        rows = [(
-            p["zona"], p["lote"], p["fecha_desde"], p["fecha_hasta"],
-            p["nombre_finca"] or "(sin nombre)", p["propietario"] or "(sin propietario)",
-            str(p["documento"] or ""), p["plantas"], p["ubicacion"],
-            str(p["telefono"] or "") or None,
-            p["retencion"], p["fact_electronica"],
-            str(p["ica"] or "") or None, str(p["ggn"] or "") or None,
-        ) for p in productores]
-        cur.executemany(sql, rows)
+        cur.executemany(sql, productores)
         conn.commit()
     print(f"  ✓ {len(productores)} productores cargados")
 
