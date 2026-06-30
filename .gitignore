@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Entorno / secretos
+.env*
+*.env
+secrets.toml
+.streamlit/secrets.toml
+
+# Datos locales y respaldos (no versionar)
+data/
+*.db
+*.sqlite
+*.dump
+*.bak
+
+# Reportes/insumos crudos
+*.xlsx
+*.xls
+*.xlsm
+*.xml
+*.pbix
+!db/*.sql
+
+# Sistema
+.DS_Store
+Thumbs.db

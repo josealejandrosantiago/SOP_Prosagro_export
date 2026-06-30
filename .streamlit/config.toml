@@ -1,0 +1,14 @@
+[server]
+port = 8502
+headless = false
+runOnSave = true
+
+[theme]
+primaryColor       = "#1FA4DB"   # azul Prosagro
+backgroundColor    = "#FFFFFF"
+secondaryBackgroundColor = "#F8FAFC"
+textColor          = "#1F2937"
+font               = "sans serif"
+
+[browser]
+gatherUsageStats = false

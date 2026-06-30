@@ -1,0 +1,21 @@
+# No copiar a la imagen (más liviana + sin secretos)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.git/
+.github/
+data/
+docs/
+*.xlsx
+*.xls
+*.xlsm
+*.bak
+*.dump
+*.bat
+.env*
+*.env
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
+README.md
