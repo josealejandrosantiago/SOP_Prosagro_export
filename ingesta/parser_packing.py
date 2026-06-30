@@ -190,6 +190,12 @@ def _parsear_legacy(wb) -> PackingList:
         contenedor = f"OP-{m.group(1)}"
 
     fecha_inicio = _solo_fecha(resumen.cell(6, 4).value)
+    # Validar que la fecha no sea absurdamente vieja (>1 año atrás del año
+    # actual). Algunos packing lists vienen con año 2021 / 2022 por tipeo de
+    # la maquila (ej. PACKING LIST EXP #327 = "20/06/2021" en lugar de 2026).
+    # Si pasa, dejamos None: el cruce caerá a today() como referencia.
+    if fecha_inicio and fecha_inicio.year < dt.date.today().year - 1:
+        fecha_inicio = None
     total_2kg = _i(resumen.cell(11, 8).value)
     total_pallets = _i(resumen.cell(12, 8).value) or total_2kg
 
