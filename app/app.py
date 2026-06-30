@@ -110,8 +110,8 @@ if seccion == "Inicio":
         with get_conn() as conn, conn.cursor() as cur:
             cur.execute("SELECT COUNT(*) FROM prosagro.zonas")
             zonas = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM prosagro.frutas")
-            frutas = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM prosagro.productores")
+            productores = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM prosagro.ingresos")
             ingresos = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM prosagro.kg_consolidado")
@@ -121,7 +121,7 @@ if seccion == "Inicio":
 
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric("Zonas",              zonas)
-        c2.metric("Frutas",             frutas)
+        c2.metric("Productores",        productores)
         c3.metric("Ingresos cargados",  ingresos)
         c4.metric("Kg consolidado",     kgc)
         c5.metric("Contenedores",       cont)
@@ -143,8 +143,8 @@ if seccion == "Inicio":
     )
 
 elif seccion == "Ingreso de fruta":
-    _pendiente("ingreso", "Fase 1", "Subir 'Informe de proceso semana N' → parametriza → "
-               "guarda ingresos / fruta_export / fruta_nacional → reconstruye Kg consolidado.")
+    from app.paginas import ingreso_fruta
+    ingreso_fruta.render(user)
 elif seccion == "Liquidación productores":
     _pendiente("liquidacion", "Fase 2", "Generar PDF de liquidación, enviar por Twilio, "
                "emitir DR de cuentas por cobrar / fact. electrónica a PyA.")
