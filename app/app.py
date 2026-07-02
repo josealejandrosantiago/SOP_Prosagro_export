@@ -49,6 +49,32 @@ user = login_form()
 if not user:
     st.stop()
 
+# Secciones del menú. Los admin ven todas; los demás solo las que el admin les dio.
+SECCIONES = [
+    "Inicio",
+    "Ingreso de fruta",
+    "Liquidación productores",
+    "Causales de rechazo",
+    "Contenedores",
+    "SOP (costeo)",
+    "GGN / Certificación",
+    "Distribución a clientes",
+    "Ventas",
+    "Costos logísticos",
+    "Conciliación facturas",
+    "Simulación de viaje",
+    "Proyección de fruta",
+    "Tableros",
+    "Configuración",
+]
+SECCION_ADMIN = "⚙️ Usuarios y permisos"
+
+if user.get("es_admin"):
+    _menu = ["Inicio"] + [s for s in SECCIONES if s != "Inicio"] + [SECCION_ADMIN]
+else:
+    permitidas = user.get("secciones") or set()
+    _menu = ["Inicio"] + [s for s in SECCIONES if s != "Inicio" and s in permitidas]
+
 # ────────────────────────────── Sidebar ──────────────────────────────────────
 with st.sidebar:
     # Logo de Prosagro debajo de la barra azul. Busca varios nombres posibles.
@@ -70,31 +96,11 @@ with st.sidebar:
         )
 
     st.divider()
-    seccion = st.radio(
-        "Módulo",
-        [
-            "Inicio",
-            "Ingreso de fruta",
-            "Liquidación productores",
-            "Causales de rechazo",
-            "Contenedores",
-            "SOP (costeo)",
-            "GGN / Certificación",
-            "Distribución a clientes",
-            "Ventas",
-            "Costos logísticos",
-            "Conciliación facturas",
-            "Simulación de viaje",
-            "Proyección de fruta",
-            "Tableros",
-            "Configuración",
-        ],
-        index=0,
-        label_visibility="collapsed",
-    )
+    seccion = st.radio("Módulo", _menu, index=0, label_visibility="collapsed")
 
     st.divider()
-    st.caption(f"Sesión: **{user['nombre']}**")
+    rol = "Admin" if user.get("es_admin") else "Usuario"
+    st.caption(f"Sesión: **{user['nombre']}** · {rol}")
     if st.button("Cerrar sesión", use_container_width=True):
         del st.session_state["user"]
         st.rerun()
@@ -204,3 +210,9 @@ elif seccion == "Tableros":
 elif seccion == "Configuración":
     from app.paginas import configuracion
     configuracion.render(user)
+elif seccion == SECCION_ADMIN:
+    if not user.get("es_admin"):
+        st.error("⛔ Solo administradores.")
+    else:
+        from app.paginas import usuarios
+        usuarios.render(user, SECCIONES)
