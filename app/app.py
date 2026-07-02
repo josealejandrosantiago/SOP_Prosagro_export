@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from app.brand import COLORS, MODULE_COLORS, streamlit_css  # noqa: E402
+from app.brand import COLORS, MODULE_COLORS, img_b64, streamlit_css  # noqa: E402
 from app.auth import ensure_default_user, login_form  # noqa: E402
 
 st.set_page_config(
@@ -25,7 +25,18 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown(streamlit_css(), unsafe_allow_html=True)
+# Imagen de fondo (plántulas) — busca varios nombres/extensiones posibles.
+BRAND_DIR = ROOT / "app" / "assets" / "brand"
+_bg_b64 = None
+_bg_mime = "image/jpeg"
+for _cand in ("fondo-plantulas.jpg", "fondo-plantulas.png", "fondo.jpg", "fondo.png"):
+    _b64 = img_b64(BRAND_DIR / _cand)
+    if _b64:
+        _bg_b64 = _b64
+        _bg_mime = "image/png" if _cand.endswith(".png") else "image/jpeg"
+        break
+
+st.markdown(streamlit_css(bg_b64=_bg_b64, bg_mime=_bg_mime), unsafe_allow_html=True)
 
 # Bootstrap del usuario admin local si .env trae APP_PASSWORD_HASH.
 try:
@@ -40,11 +51,14 @@ if not user:
 
 # ────────────────────────────── Sidebar ──────────────────────────────────────
 with st.sidebar:
-    # Si los logos están guardados, se muestran. Si no, fallback en texto.
-    brand_dir = ROOT / "app" / "assets" / "brand"
-    logo = brand_dir / "logo-vertical.png"
-    if logo.exists():
-        st.image(str(logo), use_container_width=True)
+    # Logo de Prosagro debajo de la barra azul. Busca varios nombres posibles.
+    _logo_path = None
+    for _lc in ("logo-prosagro.png", "logo-vertical.png", "logo.png"):
+        if (BRAND_DIR / _lc).exists():
+            _logo_path = BRAND_DIR / _lc
+            break
+    if _logo_path:
+        st.image(str(_logo_path), use_container_width=True)
     else:
         st.markdown(
             f"<h2 style='color:{COLORS['primary']};margin:0'>Prosagro</h2>"

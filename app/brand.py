@@ -3,11 +3,16 @@
 Los valores hex de aquí se aplican via CSS en `app.py` para que toda la
 interfaz comparta colores con el manual de marca.
 """
+from __future__ import annotations
+
+import base64
+from pathlib import Path
 
 # Paleta primaria — extraída del logotipo y patrón de marca.
 COLORS = {
-    "primary":      "#1FA4DB",   # azul Prosagro (del lockup "Prosagro export")
-    "secondary":    "#159FDB",   # cyan complementario (sidebar bottom)
+    "primary":      "#1FA4DB",   # azul Prosagro (barra superior)
+    "primary_soft": "#DCEFF9",   # azul clarito (menú lateral)
+    "secondary":    "#159FDB",   # cyan complementario
     "magenta":      "#E91A6B",   # acento / badges
     "yellow":       "#FFD400",   # warnings
     "coral":        "#EE4D3A",   # errores
@@ -32,38 +37,80 @@ MODULE_COLORS = {
 }
 
 
-def streamlit_css() -> str:
-    """CSS para inyectar en la app de Streamlit (st.markdown unsafe_allow_html)."""
+def img_b64(path: str | Path) -> str | None:
+    """Devuelve la imagen como base64 (o None si no existe). Para incrustar
+    en CSS sin depender de archivos servidos (funciona igual en el contenedor)."""
+    p = Path(path)
+    if not p.exists():
+        return None
+    return base64.b64encode(p.read_bytes()).decode("ascii")
+
+
+def streamlit_css(bg_b64: str | None = None, bg_mime: str = "image/jpeg") -> str:
+    """CSS para inyectar en la app de Streamlit (st.markdown unsafe_allow_html).
+
+    bg_b64: imagen de fondo (plántulas) en base64. Si se pasa, se muestra
+            muy tenue detrás de todo el contenido.
+    """
     c = COLORS
+
+    # Bloque de fondo (solo si hay imagen). Un velo blanco al 92% lo deja tenue.
+    fondo_css = ""
+    if bg_b64:
+        fondo_css = f"""
+      [data-testid="stAppViewContainer"] {{
+        background-image:
+          linear-gradient(rgba(255,255,255,0.90), rgba(255,255,255,0.94)),
+          url("data:{bg_mime};base64,{bg_b64}");
+        background-size: cover;
+        background-position: center center;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+      }}
+      /* Tarjeta blanca semitransparente para que el texto se lea bien */
+      [data-testid="stMain"] .block-container {{
+        background: rgba(255,255,255,0.80);
+        border-radius: 14px;
+        padding: 2rem 2.5rem 3rem 2.5rem;
+        margin-top: 1rem;
+        box-shadow: 0 1px 12px rgba(31,41,55,0.06);
+      }}
+        """
+
     return f"""
     <style>
       :root {{
-        --color-primary:   {c['primary']};
-        --color-secondary: {c['secondary']};
-        --color-magenta:   {c['magenta']};
-        --color-yellow:    {c['yellow']};
-        --color-coral:     {c['coral']};
-        --color-lime:      {c['lime']};
-        --color-ink:       {c['ink']};
-        --color-muted:     {c['muted']};
+        --color-primary:      {c['primary']};
+        --color-primary-soft: {c['primary_soft']};
+        --color-secondary:    {c['secondary']};
+        --color-magenta:      {c['magenta']};
+        --color-yellow:       {c['yellow']};
+        --color-coral:        {c['coral']};
+        --color-lime:         {c['lime']};
+        --color-ink:          {c['ink']};
+        --color-muted:        {c['muted']};
       }}
 
-      /* Topbar accent */
+      /* Barra superior azul fuerte */
       header[data-testid="stHeader"] {{
         background-color: var(--color-primary) !important;
       }}
 
-      /* Sidebar — franja vertical de marca */
+      /* Menú lateral en azul clarito, sin franja de colores */
       section[data-testid="stSidebar"] {{
-        background-color: #FFFFFF;
-        border-left: 10px solid var(--color-magenta);
-        box-shadow: inset 0 -10px 0 0 var(--color-yellow),
-                    inset 0 -20px 0 0 var(--color-coral),
-                    inset 0 -30px 0 0 var(--color-lime),
-                    inset 0 -40px 0 0 var(--color-magenta),
-                    inset 0 -50px 0 0 var(--color-yellow),
-                    inset 0 -60px 0 0 var(--color-secondary);
+        background-color: var(--color-primary-soft);
+        border-right: 1px solid rgba(31,164,219,0.30);
       }}
+      section[data-testid="stSidebar"] > div {{
+        background-color: transparent;
+      }}
+      /* Texto del menú un poco más oscuro para contraste sobre el azul clarito */
+      section[data-testid="stSidebar"] label,
+      section[data-testid="stSidebar"] .stRadio div {{
+        color: var(--color-ink);
+      }}
+
+      {fondo_css}
 
       /* Botones primarios */
       .stButton > button[kind="primary"] {{
