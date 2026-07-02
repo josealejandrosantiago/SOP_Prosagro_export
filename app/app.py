@@ -58,7 +58,10 @@ with st.sidebar:
             _logo_path = BRAND_DIR / _lc
             break
     if _logo_path:
-        st.image(str(_logo_path), use_container_width=True)
+        # Logo a ~mitad de ancho del sidebar, centrado.
+        _lc1, _lc2 = st.columns([1, 1])
+        with _lc1:
+            st.image(str(_logo_path), use_container_width=True)
     else:
         st.markdown(
             f"<h2 style='color:{COLORS['primary']};margin:0'>Prosagro</h2>"

@@ -54,26 +54,30 @@ def streamlit_css(bg_b64: str | None = None, bg_mime: str = "image/jpeg") -> str
     """
     c = COLORS
 
-    # Bloque de fondo (solo si hay imagen). Un velo blanco al 92% lo deja tenue.
+    # Bloque de fondo (solo si hay imagen). La foto se ve tenue en TODA la
+    # ventana (login y dashboard). La tarjeta de contenido es translúcida +
+    # blur para que la foto se perciba detrás sin sacrificar legibilidad.
     fondo_css = ""
     if bg_b64:
         fondo_css = f"""
       [data-testid="stAppViewContainer"] {{
         background-image:
-          linear-gradient(rgba(255,255,255,0.90), rgba(255,255,255,0.94)),
+          linear-gradient(rgba(255,255,255,0.74), rgba(255,255,255,0.82)),
           url("data:{bg_mime};base64,{bg_b64}");
         background-size: cover;
         background-position: center center;
         background-attachment: fixed;
         background-repeat: no-repeat;
       }}
-      /* Tarjeta blanca semitransparente para que el texto se lea bien */
+      /* Tarjeta translúcida: deja ver la foto tenue detrás del contenido */
       [data-testid="stMain"] .block-container {{
-        background: rgba(255,255,255,0.80);
+        background: rgba(255,255,255,0.55);
         border-radius: 14px;
         padding: 2rem 2.5rem 3rem 2.5rem;
         margin-top: 1rem;
-        box-shadow: 0 1px 12px rgba(31,41,55,0.06);
+        box-shadow: 0 2px 16px rgba(31,41,55,0.08);
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
       }}
         """
 
