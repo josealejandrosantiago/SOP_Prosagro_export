@@ -163,17 +163,17 @@ elif seccion == "Ingreso de fruta":
     from app.paginas import ingreso_fruta
     ingreso_fruta.render(user)
 elif seccion == "Liquidación productores":
-    _pendiente("liquidacion", "Fase 2", "Generar PDF de liquidación, enviar por Twilio, "
-               "emitir DR de cuentas por cobrar / fact. electrónica a PyA.")
+    from app.paginas import liquidacion
+    liquidacion.render(user)
 elif seccion == "Causales de rechazo":
-    _pendiente("causales", "Fase 3", "Cargar reportes de calidad Binlab y poblar la tabla "
-               "de causales por trazabilidad.")
+    from app.paginas import causales
+    causales.render(user)
 elif seccion == "Contenedores":
-    _pendiente("contenedor", "Fase 3", "Subir packing list, cruzar pallets con fruta_export, "
-               "marcar armado completo.")
+    from app.paginas import contenedores
+    contenedores.render(user)
 elif seccion == "GGN / Certificación":
-    _pendiente("ggn", "Fase 3", "Liquidación GGN/ICA por contenedor (corrige el bug del VBA "
-               "que sobre-escribía) + PDF por productor + Twilio.")
+    from app.paginas import ggn
+    ggn.render(user)
 elif seccion == "Distribución a clientes":
     _pendiente("contenedor", "Fase 5", "Asignar pallets a clientes (drag & drop) — sustituye "
                "frmDistribucionContenedor.")
@@ -187,9 +187,8 @@ elif seccion == "Proyección de fruta":
     _pendiente("proyeccion", "Fase 4", "Mantener la proyección por zona/lote/semana con los "
                "kg reales conforme se procesa.")
 elif seccion == "Tableros":
-    _pendiente("ingreso", "Fase 4", "Réplica del tablero Power BI — Resumen global, "
-               "Proyección, Causales, Contenedores. Subpestañas que vamos creando de a poco.")
+    from app.paginas import tableros
+    tableros.render(user)
 elif seccion == "Configuración":
-    st.title("Configuración")
-    st.info("Mantenimiento de catálogos (zonas, frutas, productores, calendario de pagos, "
-            "precios vigentes, certificaciones, usuarios). Por ahora se editan directo en BD.")
+    from app.paginas import configuracion
+    configuracion.render(user)
