@@ -78,6 +78,7 @@ with st.sidebar:
             "Liquidación productores",
             "Causales de rechazo",
             "Contenedores",
+            "SOP (costeo)",
             "GGN / Certificación",
             "Distribución a clientes",
             "Ventas",
@@ -171,15 +172,18 @@ elif seccion == "Causales de rechazo":
 elif seccion == "Contenedores":
     from app.paginas import contenedores
     contenedores.render(user)
+elif seccion == "SOP (costeo)":
+    from app.paginas import sop
+    sop.render(user)
 elif seccion == "GGN / Certificación":
     from app.paginas import ggn
     ggn.render(user)
 elif seccion == "Distribución a clientes":
-    _pendiente("contenedor", "Fase 5", "Asignar pallets a clientes (drag & drop) — sustituye "
-               "frmDistribucionContenedor.")
+    from app.paginas import distribucion
+    distribucion.render(user)
 elif seccion == "Ventas":
-    _pendiente("ventas", "Fase 5", "Precio estimado + precio real (con PDF liquidación cliente) + "
-               "plano facturación venta a PyA.")
+    from app.paginas import ventas
+    ventas.render(user)
 elif seccion == "Costos logísticos":
     _pendiente("costos", "Fase 5/6", "Costos pronosticados (tarifas de últimos N contenedores) + "
                "costos reales con cruce automático de facturas recibidas por correo.")
