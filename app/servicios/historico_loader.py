@@ -77,40 +77,53 @@ def _i(v) -> int | None:
 
 
 def _parse_traza(traza: str) -> dict | None:
-    """`2026 006 697 02 06` → {anio:2026, mes:6, no_cargue:697, zona:'02', lote:'06'}."""
-    if not traza or not TRAZA_2026_RE.match(traza):
+    """Parsea la trazabilidad. Soporta los DOS formatos históricos:
+      - nuevo (2026): '2026 006 697 02 06' → no_cargue=697(parts[2]), zona=02, lote=06
+      - viejo (2025): '505 144 616 02 32'  → no_cargue=505(parts[0]), zona=02, lote=32
+    En AMBOS la zona está en parts[3] y el lote en parts[4]. El AÑO NO se saca
+    de la traza (el formato viejo no lo trae) — se toma de la columna FECHA en
+    el caller.
+    """
+    if not traza:
         return None
-    parts = PARTS_RE.split(traza)
+    parts = PARTS_RE.split(traza.strip())
+    if len(parts) < 5:
+        return None
     try:
-        return {
-            "anio": int(parts[0]),
-            "mes": int(parts[1]),
-            "no_cargue": int(parts[2]),
-            "zona": parts[3],
-            "lote": parts[4],
-        }
+        zona = parts[3]
+        lote = parts[4]
+        # formato nuevo: primer token es año de 4 dígitos → cargue en parts[2]
+        if len(parts[0]) == 4 and parts[0].isdigit():
+            no_cargue = int(parts[2])
+        else:
+            no_cargue = int(parts[0])
+        return {"no_cargue": no_cargue, "zona": zona, "lote": lote}
     except (ValueError, IndexError):
         return None
 
 
 def cargar_excel_2026(
     ruta_excel: str | Path,
-    anio_filtro: int = 2026,
+    anios: set[int] | None = None,
     semana_desde: int = 1,
-    semana_hasta: int = 25,
+    semana_hasta: int = 53,
     excluir_ya_cargadas: bool = True,
     maquiladora_default: str = "Frutand",
 ) -> dict:
     """Carga histórico desde el Excel central a BD.
 
-    - `anio_filtro`: solo trazas que empiezan con ese año (default 2026).
+    Soporta AMBOS formatos de trazabilidad (nuevo '2026 ...' y viejo
+    '505 144 616 02 32'). El AÑO se determina por la columna FECHA, no por la
+    trazabilidad (el formato viejo no trae el año).
+
+    - `anios`: conjunto de años a cargar (default {2025, 2026}).
     - `semana_desde/semana_hasta`: rango inclusivo.
-    - `excluir_ya_cargadas`: si True, no recarga trazabilidades ya presentes
-      en `ingresos` (evita pisar datos ya buenos).
-    - `maquiladora_default`: valor que se asigna si la fila no trae uno.
+    - `excluir_ya_cargadas`: si True, no recarga trazabilidades ya presentes.
     """
+    if anios is None:
+        anios = {2025, 2026}
     ruta_excel = Path(ruta_excel)
-    print(f"  Abriendo {ruta_excel.name}…")
+    print(f"  Abriendo {ruta_excel.name}…  (años: {sorted(anios)})")
     wb = openpyxl.load_workbook(ruta_excel, data_only=True, read_only=True)
 
     # 1) Leer Ingreso Gulupa, Fruta Exportación, Fruta Nacional
@@ -121,23 +134,23 @@ def cargar_excel_2026(
     print("  Leyendo Ingreso Gulupa…")
     ws = wb["Ingreso Gulupa"]
     for row in ws.iter_rows(min_row=2, values_only=True):
-        # col 16 (idx 15) Trazabilidad, col 17 (idx 16) Semana
+        # col 16 (idx 15) Trazabilidad, col 17 (idx 16) Semana, col 5 (idx 4) FECHA INGRESO
         traza = _s(row[15])
         if not traza:
             continue
         p = _parse_traza(traza)
-        if not p or p["anio"] != anio_filtro:
+        if not p:
             continue
-        semana = _i(row[16])
-        if semana is None or not (semana_desde <= semana <= semana_hasta):
+        fecha = _solo_fecha(row[4])
+        if fecha is None or fecha.year not in anios:
             continue
-        fecha = _solo_fecha(row[4])  # col 5 FECHA INGRESO
-        if fecha is None:
+        semana = _i(row[16]) or fecha.isocalendar()[1]
+        if not (semana_desde <= semana <= semana_hasta):
             continue
         ingresos.append({
             "trazabilidad": traza,
             "semana": semana,
-            "anio": p["anio"],
+            "anio": fecha.year,
             "fecha_ingreso": fecha,
             "no_cargue": p["no_cargue"],
             "zona": p["zona"],
@@ -161,14 +174,14 @@ def cargar_excel_2026(
         if not traza:
             continue
         p = _parse_traza(traza)
-        if not p or p["anio"] != anio_filtro:
-            continue
-        semana = _i(row[0])
-        if semana is None or not (semana_desde <= semana <= semana_hasta):
+        if not p:
             continue
         fecha_ingreso = _solo_fecha(row[9]) or _solo_fecha(row[10])
         fecha_proc = _solo_fecha(row[10]) or fecha_ingreso
-        if fecha_ingreso is None:
+        if fecha_ingreso is None or fecha_ingreso.year not in anios:
+            continue
+        semana = _i(row[0]) or fecha_ingreso.isocalendar()[1]
+        if not (semana_desde <= semana <= semana_hasta):
             continue
         cal = _s(row[12]) or ""
         # El Excel a veces guarda calibre como número (38) o letra (M) — lo
@@ -177,7 +190,7 @@ def cargar_excel_2026(
         exports.append({
             "trazabilidad": traza,
             "semana": semana,
-            "anio": p["anio"],
+            "anio": fecha_ingreso.year,
             "fecha_ingreso": fecha_ingreso,
             "fecha_procesamiento": fecha_proc,
             "no_cargue": p["no_cargue"],
@@ -210,21 +223,18 @@ def cargar_excel_2026(
         if not traza:
             continue
         p = _parse_traza(traza)
-        if not p or p["anio"] != anio_filtro:
+        if not p:
             continue
-        # Inferir semana si la celda viene vacía: tomar de iso week
-        semana = _i(row[5])
         fecha = _solo_fecha(row[0])
-        if semana is None and fecha:
-            semana = fecha.isocalendar()[1]
-        if semana is None or not (semana_desde <= semana <= semana_hasta):
+        if fecha is None or fecha.year not in anios:
             continue
-        if fecha is None:
+        semana = _i(row[5]) or fecha.isocalendar()[1]
+        if not (semana_desde <= semana <= semana_hasta):
             continue
         nacionales.append({
             "trazabilidad": traza,
             "semana": semana,
-            "anio": p["anio"],
+            "anio": fecha.year,
             "fecha_ingreso": fecha,
             "fecha_procesamiento": fecha,
             "no_cargue": p["no_cargue"],
