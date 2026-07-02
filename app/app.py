@@ -83,6 +83,8 @@ with st.sidebar:
             "Distribución a clientes",
             "Ventas",
             "Costos logísticos",
+            "Conciliación facturas",
+            "Simulación de viaje",
             "Proyección de fruta",
             "Tableros",
             "Configuración",
@@ -187,6 +189,12 @@ elif seccion == "Ventas":
 elif seccion == "Costos logísticos":
     _pendiente("costos", "Fase 5/6", "Costos pronosticados (tarifas de últimos N contenedores) + "
                "costos reales con cruce automático de facturas recibidas por correo.")
+elif seccion == "Conciliación facturas":
+    from app.paginas import conciliacion
+    conciliacion.render(user)
+elif seccion == "Simulación de viaje":
+    from app.paginas import simulacion_viaje
+    simulacion_viaje.render(user)
 elif seccion == "Proyección de fruta":
     _pendiente("proyeccion", "Fase 4", "Mantener la proyección por zona/lote/semana con los "
                "kg reales conforme se procesa.")

@@ -99,7 +99,7 @@ def detalle_sop(codigo: str) -> dict:
     with get_conn() as c, c.cursor() as cur:
         cur.execute(
             """
-            SELECT e.trazabilidad, e.zona, e.lote, e.predio, e.calibre_num,
+            SELECT e.trazabilidad, k.zona, k.lote, e.predio, e.calibre_num,
                    SUM(e.cant_cajas)      AS cajas,
                    SUM(e.total_kg_netos)  AS kg,
                    MAX(k.precio_expo)     AS precio_expo,
@@ -107,8 +107,8 @@ def detalle_sop(codigo: str) -> dict:
             FROM prosagro.fruta_export e
             LEFT JOIN prosagro.kg_consolidado k ON k.trazabilidad = e.trazabilidad
             WHERE e.contenedor_codigo = %s AND e.categoria = 'C1'
-            GROUP BY e.trazabilidad, e.zona, e.lote, e.predio, e.calibre_num
-            ORDER BY e.zona, e.lote, e.calibre_num
+            GROUP BY e.trazabilidad, k.zona, k.lote, e.predio, e.calibre_num
+            ORDER BY k.zona, k.lote, e.calibre_num
             """,
             (codigo,),
         )
